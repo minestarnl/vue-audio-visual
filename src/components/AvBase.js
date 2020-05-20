@@ -92,6 +92,16 @@ const props = {
   canvFillColor: {
     type: [String, Array],
     default: null
+  },
+
+  /**
+   * prop: 'canv-fill-color'
+   * Canvas fill background color. Can be string RGB color or canvas gradients array.
+   * Default is transperent.
+   */
+  audioComponentReference: {
+    type: HTMLAudioElement,
+    default: null
   }
 }
 
@@ -106,9 +116,12 @@ const methods = {
     const canvDiv = document.createElement('div')
     let audioDiv = null
     let audio = null
+    canvDiv.classList.add('vue-audio-visual-div')
 
     if (this.refLink) {
       audio = this.$parent.$refs[this.refLink]
+    } else if (this.audioComponentReference) {
+      audio = this.audioComponentReference
     } else {
       audio = document.createElement('audio')
       audioDiv = document.createElement('div')
@@ -158,18 +171,24 @@ const methods = {
     const h = this.canvHeight
     const gradient = this.ctx.createLinearGradient(w / 2, 0, w / 2, h)
     let offset = 0
-    colorsArray.forEach(color => {
+    colorsArray.forEach((color) => {
       gradient.addColorStop(offset, color)
-      offset += (1 / colorsArray.length)
+      offset += 1 / colorsArray.length
     })
     return gradient
-  }
-}
+  },
 
-export default {
-  props,
-  render: h => h('div'),
-  mounted () {
+  // This functions does the exact same as mounted but can be called at a later state.
+  // This to allow changing of sources
+  renderManually: function () {
+    // Remove the previous component. Or else we are going to get some nasty extra divs with old visualizers.
+    [].forEach.call(
+      document.querySelectorAll('.vue-audio-visual-div'),
+      function (e) {
+        e.parentNode.removeChild(e)
+      }
+    )
+
     this.createHTMLElements()
 
     this.audio.onclick = () => {
@@ -179,7 +198,8 @@ export default {
     this.audio.onplay = () => {
       if (!this.audioCtx) this.setAnalyser()
       this.mainLoop()
-      if (this.audioCtx) { // not defined for waveform
+      if (this.audioCtx) {
+        // not defined for waveform
         this.audioCtx.resume()
       }
     }
@@ -188,6 +208,36 @@ export default {
       if (this.audioCtx) {
         this.audioCtx.suspend()
         cancelAnimationFrame(this.animId)
+      }
+    }
+  }
+}
+
+export default {
+  props,
+  render: (h) => h('div'),
+  mounted () {
+    if (this.autoRender) {
+      this.createHTMLElements()
+
+      this.audio.onclick = () => {
+        if (!this.audioCtx) this.setAnalyser()
+      }
+
+      this.audio.onplay = () => {
+        if (!this.audioCtx) this.setAnalyser()
+        this.mainLoop()
+        if (this.audioCtx) {
+          // not defined for waveform
+          this.audioCtx.resume()
+        }
+      }
+
+      this.audio.onpause = () => {
+        if (this.audioCtx) {
+          this.audioCtx.suspend()
+          cancelAnimationFrame(this.animId)
+        }
       }
     }
   },
